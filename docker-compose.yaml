@@ -1,0 +1,9 @@
+version: "2.1"
+
+services:
+  redis:
+    container_name: jwt-todo-redis
+    image: redis:6-alpine
+    command: redis-server
+    ports:
+      - "6379:6379"
