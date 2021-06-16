@@ -1,9 +1,11 @@
 package main
 
 import (
+	"jwt-todo/redis"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -25,7 +27,7 @@ type TokenDetails struct {
 	AccessToken  string
 	RefreshToken string
 	AccessUuid   string
-	Refreshuuid  string
+	RefreshUuid  string
 	AtExpires    int64
 	RtExpires    int64
 }
@@ -50,13 +52,20 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	token, err := CreateToken(user.ID)
+	ts, err := CreateToken(user.ID)
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-
-	c.JSON(http.StatusOK, token)
+	saveErr := CreateAuth(user.ID, ts)
+	if saveErr != nil {
+		c.JSON(http.StatusUnprocessableEntity, saveErr.Error())
+	}
+	tokens := map[string]string{
+		"access_token":  ts.AccessToken,
+		"refresh_token": ts.RefreshToken,
+	}
+	c.JSON(http.StatusOK, tokens)
 }
 
 func CreateToken(userID uint64) (*TokenDetails, error) {
@@ -64,7 +73,7 @@ func CreateToken(userID uint64) (*TokenDetails, error) {
 		AtExpires:   time.Now().Add(time.Minute * 15).Unix(),
 		AccessUuid:  uuid.NewV4().String(),
 		RtExpires:   time.Now().Add(time.Hour * 24 * 7).Unix(),
-		Refreshuuid: uuid.NewV4().String(),
+		RefreshUuid: uuid.NewV4().String(),
 	}
 
 	var err error
@@ -86,7 +95,7 @@ func CreateToken(userID uint64) (*TokenDetails, error) {
 	// Creating Refrash Token
 	os.Setenv("REFRESH_SECRET", "poiuwpoiewupoi")
 	rtClaims := jwt.MapClaims{}
-	rtClaims["refrash_uuid"] = td.Refreshuuid
+	rtClaims["refrash_uuid"] = td.RefreshUuid
 	rtClaims["user_id"] = userID
 	rtClaims["exp"] = td.RtExpires
 	rt := jwt.NewWithClaims(jwt.SigningMethodHS256, rtClaims)
@@ -98,7 +107,29 @@ func CreateToken(userID uint64) (*TokenDetails, error) {
 	return td, nil
 }
 
+func CreateAuth(userID uint64, td *TokenDetails) error {
+	at := time.Unix(td.AtExpires, 0)
+	rt := time.Unix(td.RtExpires, 0)
+	now := time.Now()
+
+	rd := redis.GetCacheInstance()
+	errAccess := rd.Set(td.AccessUuid, []byte(strconv.Itoa(int(userID))), at.Sub(now))
+	if errAccess != nil {
+		return errAccess
+	}
+
+	errRefresh := rd.Set(td.RefreshUuid, []byte(strconv.Itoa(int(userID))), rt.Sub(now))
+	if errRefresh != nil {
+		return errRefresh
+	}
+	return nil
+}
+
 func main() {
+	err := redis.Setup()
+	if err != nil {
+		panic(err)
+	}
 	router.POST("/login", Login)
 	log.Fatal(router.Run(":8080"))
 }
