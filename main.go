@@ -8,6 +8,7 @@ import (
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
+	"github.com/twinj/uuid"
 )
 
 var (
@@ -18,6 +19,15 @@ type User struct {
 	ID       uint64 `json:"id"`
 	Username string `json:"username"`
 	Password string `json:"password"`
+}
+
+type TokenDetails struct {
+	AccessToken  string
+	RefreshToken string
+	AccessUuid   string
+	Refreshuuid  string
+	AtExpires    int64
+	RtExpires    int64
 }
 
 // A simple user
@@ -49,23 +59,43 @@ func Login(c *gin.Context) {
 	c.JSON(http.StatusOK, token)
 }
 
-func CreateToken(userID uint64) (string, error) {
+func CreateToken(userID uint64) (*TokenDetails, error) {
+	td := &TokenDetails{
+		AtExpires:   time.Now().Add(time.Minute * 15).Unix(),
+		AccessUuid:  uuid.NewV4().String(),
+		RtExpires:   time.Now().Add(time.Hour * 24 * 7).Unix(),
+		Refreshuuid: uuid.NewV4().String(),
+	}
+
 	var err error
 
 	// Creating Access Token
 	os.Setenv("ACCESS_SECRET", "asdfasdfasd") // this should be in an env file
 	atClaims := jwt.MapClaims{}
 	atClaims["authorized"] = true
+	atClaims["access_uuid"] = td.AccessUuid
 	atClaims["user_id"] = userID
-	atClaims["exp"] = time.Now().Add(time.Minute * 15).Unix()
+	atClaims["exp"] = td.AtExpires
 
 	at := jwt.NewWithClaims(jwt.SigningMethodHS256, atClaims)
-	token, err := at.SignedString([]byte(os.Getenv("ACCESS_SECRET")))
+	td.AccessToken, err = at.SignedString([]byte(os.Getenv("ACCESS_SECRET")))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return token, nil
+	// Creating Refrash Token
+	os.Setenv("REFRESH_SECRET", "poiuwpoiewupoi")
+	rtClaims := jwt.MapClaims{}
+	rtClaims["refrash_uuid"] = td.Refreshuuid
+	rtClaims["user_id"] = userID
+	rtClaims["exp"] = td.RtExpires
+	rt := jwt.NewWithClaims(jwt.SigningMethodHS256, rtClaims)
+	td.RefreshToken, err = rt.SignedString([]byte(os.Getenv("REFRESH_SECRET")))
+	if err != nil {
+		return nil, err
+	}
+
+	return td, nil
 }
 
 func main() {
