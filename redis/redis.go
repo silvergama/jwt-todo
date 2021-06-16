@@ -43,7 +43,13 @@ func Setup() error {
 
 func createClient(addr string) *redis.Client {
 	return redis.NewClient(&redis.Options{
-		Addr: addr,
+		Addr:        addr,
+		Password:    "", // no password set
+		DB:          0,  // use default DB
+		MaxRetries:  2,
+		DialTimeout: time.Duration(2) * time.Second,
+		ReadTimeout: time.Duration(1) * time.Second,
+		PoolTimeout: time.Duration(15) * time.Second,
 	})
 }
 
