@@ -1,4 +1,4 @@
-module jwt-todo
+module github.com/silvergama/jwt-todo
 
 go 1.16
 
