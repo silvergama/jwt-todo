@@ -235,12 +235,34 @@ func CreateTodo(c *gin.Context) {
 	c.JSON(http.StatusCreated, td)
 }
 
+func DeleteAuth(uuid string) int64 {
+	return redis.GetCacheInstance().Del(uuid)
+}
+
+func Logout(c *gin.Context) {
+	au, err := ExtractTokenMetadata(c.Request)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	deleted := DeleteAuth(au.AccessUuid)
+	if deleted == 0 {
+		c.JSON(http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	c.JSON(http.StatusOK, "Successfully logged out")
+}
+
 func main() {
 	err := redis.Setup()
 	if err != nil {
 		panic(err)
 	}
 	router.POST("/login", Login)
-	router.POST("todo", CreateTodo)
+	router.POST("/todo", CreateTodo)
+	router.POST("/logout", Logout)
+
 	log.Fatal(router.Run(":8080"))
 }
