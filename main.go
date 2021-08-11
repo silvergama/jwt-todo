@@ -353,5 +353,5 @@ func main() {
 	router.POST("/todo", CreateTodo)
 	router.POST("/token/refresh", Refresh)
 	router.POST("/logout", Logout)
-	log.Fatal(router.Run(":80"))
+	log.Fatal(router.Run(":" + os.Getenv("APP_PORT")))
 }
