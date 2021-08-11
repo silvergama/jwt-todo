@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -26,9 +27,10 @@ func GetCacheInstance() RedisService {
 }
 
 func Setup() error {
-	redisHost := os.Getenv("REDIS_URL")
-	redisClientReader := createClient(redisHost)
-	redisClientWriter := createClient(redisHost)
+	redisHost := fmt.Sprintf("%s:%s", os.Getenv("REDIS_HOST"), os.Getenv("REDIS_PORT"))
+	redisPassword := os.Getenv("REDIS_PASSWORD")
+	redisClientReader := createClient(redisHost, redisPassword)
+	redisClientWriter := createClient(redisHost, redisPassword)
 	cacheInstance = &service{
 		clientReader: redisClientReader,
 		clientWriter: redisClientWriter,
@@ -43,11 +45,11 @@ func Setup() error {
 	return err
 }
 
-func createClient(addr string) *redis.Client {
+func createClient(addr, password string) *redis.Client {
 	return redis.NewClient(&redis.Options{
 		Addr:        addr,
-		Password:    "", // no password set
-		DB:          0,  // use default DB
+		Password:    password,
+		DB:          0, // use default DB
 		MaxRetries:  2,
 		DialTimeout: time.Duration(2) * time.Second,
 		ReadTimeout: time.Duration(1) * time.Second,
