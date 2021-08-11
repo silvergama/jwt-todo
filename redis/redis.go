@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -27,16 +26,21 @@ func GetCacheInstance() RedisService {
 }
 
 func Setup() error {
-	redisHost := fmt.Sprintf("%s:%s", os.Getenv("REDIS_HOST"), os.Getenv("REDIS_PORT"))
-	redisPassword := os.Getenv("REDIS_PASSWORD")
-	redisClientReader := createClient(redisHost, redisPassword)
-	redisClientWriter := createClient(redisHost, redisPassword)
+
+	redisClientReader, err := createClient(os.Getenv("REDIS_URL"))
+	if err != nil {
+		return err
+	}
+	redisClientWriter, err := createClient(os.Getenv("REDIS_URL"))
+	if err != nil {
+		return err
+	}
 	cacheInstance = &service{
 		clientReader: redisClientReader,
 		clientWriter: redisClientWriter,
 	}
 
-	_, err := redisClientReader.Ping().Result()
+	_, err = redisClientReader.Ping().Result()
 	if err != nil {
 		return err
 	}
@@ -45,16 +49,12 @@ func Setup() error {
 	return err
 }
 
-func createClient(addr, password string) *redis.Client {
-	return redis.NewClient(&redis.Options{
-		Addr:        addr,
-		Password:    password,
-		DB:          0, // use default DB
-		MaxRetries:  2,
-		DialTimeout: time.Duration(2) * time.Second,
-		ReadTimeout: time.Duration(1) * time.Second,
-		PoolTimeout: time.Duration(15) * time.Second,
-	})
+func createClient(redisURL string) (*redis.Client, error) {
+	opt, err := redis.ParseURL(redisURL)
+	if err != nil {
+		return nil, err
+	}
+	return redis.NewClient(opt), nil
 }
 
 func (s *service) Set(key string, value []byte, exp time.Duration) error {
