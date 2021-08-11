@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"os"
 	"time"
 
 	"github.com/go-redis/redis/v7"
@@ -25,8 +26,9 @@ func GetCacheInstance() RedisService {
 }
 
 func Setup() error {
-	redisClientReader := createClient("localhost:6379")
-	redisClientWriter := createClient("localhost:6379")
+	redisHost := os.Getenv("REDIS_URL")
+	redisClientReader := createClient(redisHost)
+	redisClientWriter := createClient(redisHost)
 	cacheInstance = &service{
 		clientReader: redisClientReader,
 		clientWriter: redisClientWriter,
